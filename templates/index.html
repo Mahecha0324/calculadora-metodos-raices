@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solucionador de Ecuaciones</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f2d57'/%3E%3Cpath d='M6 24c4 0 5-14 10-14s5 10 10 4' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <!-- KaTeX (incluido en static/vendor): dibuja las fórmulas matemáticas sin necesidad de internet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/katex/katex.min.css') }}">
+  <script src="{{ url_for('static', filename='vendor/katex/katex.min.js') }}"></script>
+  <script src="{{ url_for('plotly_js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script>
+    // Aplica el tema guardado antes de pintar la página (evita parpadeo)
+    try { const t = localStorage.getItem('tema'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="marca">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M6 24c4 0 5-14 10-14s5 10 10 4" /></svg>
+      </div>
+      <div>
+        <h1>Solucionador de Ecuaciones</h1>
+        <p>Métodos de Falsa Posición y Newton-Raphson</p>
+      </div>
+    </div>
+    <button id="btn-tema" class="btn-icono" type="button" title="Cambiar tema claro / oscuro" aria-label="Cambiar tema">
+      <svg class="icono-luna" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="icono-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v3M12 19.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1.5 12h3M19.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+    </button>
+  </header>
+
+  <main class="contenedor">
+    <!-- ============ PANEL DE INGRESO DE DATOS ============ -->
+    <aside class="tarjeta panel-datos">
+      <h2>Datos de la función</h2>
+      <form id="formulario" novalidate>
+        <div class="campo">
+          <label for="funcion">Función f(x):</label>
+          <input id="funcion" name="funcion" type="text" autocomplete="off" spellcheck="false"
+                 value="x^3 - x - 1" placeholder="Ej.: x^3 - x - 1">
+          <div class="vista-previa" id="vista-previa" aria-live="polite"></div>
+          <p class="error-campo" data-error="funcion"></p>
+          <details class="ayuda">
+            <summary>¿Cómo escribir la función?</summary>
+            <ul>
+              <li>Potencias: <code>x^2</code> · Multiplicación: <code>2*x</code> o <code>2x</code></li>
+              <li>Funciones: <code>sin cos tan exp ln log sqrt abs</code> (también <code>sen</code>)</li>
+              <li>Constantes: <code>pi</code>, <code>e</code> &nbsp;·&nbsp; Ecuaciones: <code>x^2 = 2</code></li>
+              <li>En los campos numéricos puede usar <code>pi/2</code>, <code>1e-4</code> o <code>0,5</code></li>
+            </ul>
+          </details>
+        </div>
+
+        <div class="campo">
+          <label for="ejemplos">Ejemplos:</label>
+          <select id="ejemplos">
+            <option value="">— Cargar un ejemplo —</option>
+          </select>
+        </div>
+
+        <fieldset class="campo">
+          <legend>Método:</legend>
+          <label class="opcion-metodo">
+            <input type="radio" name="metodo" value="falsa_posicion" checked>
+            <span><strong>Falsa Posición</strong><small>Método cerrado · requiere intervalo [a, b]</small></span>
+          </label>
+          <label class="opcion-metodo">
+            <input type="radio" name="metodo" value="newton_raphson">
+            <span><strong>Newton-Raphson</strong><small>Método abierto · requiere valor inicial x₀</small></span>
+          </label>
+          <p class="error-campo" data-error="metodo"></p>
+        </fieldset>
+
+        <div class="fila-2" data-metodo="falsa_posicion">
+          <div class="campo">
+            <label for="a">Límite inferior (a):</label>
+            <input id="a" name="a" type="text" inputmode="decimal" value="0">
+            <p class="error-campo" data-error="a"></p>
+          </div>
+          <div class="campo">
+            <label for="b">Límite superior (b):</label>
+            <input id="b" name="b" type="text" inputmode="decimal" value="2">
+            <p class="error-campo" data-error="b"></p>
+          </div>
+        </div>
+
+        <div class="campo" data-metodo="newton_raphson" hidden>
+          <label for="x0">Valor inicial (x₀):</label>
+          <input id="x0" name="x0" type="text" inputmode="decimal" value="1">
+          <p class="error-campo" data-error="x0"></p>
+        </div>
+
+        <div class="fila-2">
+          <div class="campo">
+            <label for="tolerancia" id="etiqueta-tolerancia">Tolerancia (ε):</label>
+            <input id="tolerancia" name="tolerancia" type="text" inputmode="decimal" value="0.0001">
+            <p class="error-campo" data-error="tolerancia"></p>
+          </div>
+          <div class="campo">
+            <label for="max_iter">Máx. de iteraciones:</label>
+            <input id="max_iter" name="max_iter" type="number" min="1" max="1000" step="1" value="50">
+            <p class="error-campo" data-error="max_iter"></p>
+          </div>
+        </div>
+
+        <details class="avanzado">
+          <summary>Opciones avanzadas</summary>
+          <div class="campo">
+            <label for="criterio">Criterio de parada:</label>
+            <select id="criterio" name="criterio">
+              <option value="absoluto">Error absoluto |xₙ − xₙ₋₁| &lt; ε</option>
+              <option value="relativo">Error relativo porcentual &lt; ε %</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="decimales">Decimales a mostrar:</label>
+            <input id="decimales" name="decimales" type="number" min="2" max="12" step="1" value="6">
+            <p class="error-campo" data-error="decimales"></p>
+          </div>
+        </details>
+
+        <div class="alerta alerta-error" id="error-general" hidden></div>
+
+        <button type="submit" class="btn btn-primario" id="btn-resolver">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+          Resolver
+        </button>
+        <button type="button" class="btn btn-secundario" id="btn-limpiar">Restablecer</button>
+      </form>
+    </aside>
+
+    <!-- ============ RESULTADOS ============ -->
+    <section class="resultados">
+      <div class="tarjeta">
+        <div class="barra-pestanas">
+          <div class="pestanas" role="tablist">
+            <button class="pestana activa" role="tab" data-tab="tabla" aria-selected="true">
+              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>
+              Tabla de iteraciones
+            </button>
+            <button class="pestana" role="tab" data-tab="grafica" aria-selected="false">
+              <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+              Gráfica
+            </button>
+            <button class="pestana" role="tab" data-tab="procedimiento" aria-selected="false">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+              Procedimiento
+            </button>
+            <button class="pestana" role="tab" data-tab="resumen" aria-selected="false">
+              <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+              Resumen
+            </button>
+          </div>
+          <div class="exportar">
+            <button type="button" class="btn btn-exportar" id="btn-pdf" disabled title="Descargar reporte PDF">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg> PDF
+            </button>
+            <button type="button" class="btn btn-exportar" id="btn-excel" disabled title="Descargar libro de Excel">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg> Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="estado-vacio" id="estado-vacio">
+          <svg viewBox="0 0 32 32"><path d="M6 24c4 0 5-14 10-14s5 10 10 4"/></svg>
+          <p>Ingrese la función y los parámetros, y presione <strong>Resolver</strong>.</p>
+          <p class="tenue">Se mostrará la tabla de iteraciones, la gráfica, el procedimiento paso a paso y el resumen.</p>
+        </div>
+
+        <div class="panel-tab" id="tab-tabla" role="tabpanel" hidden>
+          <h3 id="titulo-tabla">Iteraciones</h3>
+          <div class="tabla-scroll"><table class="tabla" id="tabla"></table></div>
+        </div>
+
+        <div class="panel-tab" id="tab-grafica" role="tabpanel" hidden>
+          <h3>Gráfica de la función</h3>
+          <div id="grafica-funcion" class="grafica"></div>
+          <h3>Convergencia del error</h3>
+          <div id="grafica-error" class="grafica grafica-pequena"></div>
+          <p class="tenue" id="sin-error" hidden>Se necesitan al menos dos iteraciones para graficar el error.</p>
+        </div>
+
+        <div class="panel-tab" id="tab-procedimiento" role="tabpanel" hidden>
+          <div id="procedimiento"></div>
+        </div>
+
+        <div class="panel-tab" id="tab-resumen" role="tabpanel" hidden>
+          <div id="resumen-detallado"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta resumen" id="resumen" hidden>
+        <h3 class="resumen-titulo">
+          <svg viewBox="0 0 24 24" class="icono-estado"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>
+          Resumen de resultados
+        </h3>
+        <div class="resumen-grid">
+          <div><span>Método</span><strong id="r-metodo"></strong></div>
+          <div><span>Raíz aproximada</span><strong id="r-raiz"></strong></div>
+          <div><span>Error aproximado</span><strong id="r-error"></strong></div>
+          <div><span>Iteraciones realizadas</span><strong id="r-iter"></strong></div>
+          <div><span>Estado</span><strong><span class="insignia" id="r-estado"></span></strong></div>
+        </div>
+        <p class="resumen-mensaje" id="r-mensaje"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">Métodos numéricos · Falsa Posición (cerrado) y Newton-Raphson (abierto)</footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Ejecutar página web (Flask)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flask",
+      "env": { "FLASK_APP": "app.py", "FLASK_DEBUG": "1" },
+      "args": ["run", "--no-debugger"],
+      "jinja": true,
+      "justMyCode": true
+    },
+    {
+      "name": "Ejecutar pruebas (pytest)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-v"],
+      "justMyCode": true
+    }
+  ]
+}

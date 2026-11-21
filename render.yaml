@@ -1,0 +1,11 @@
+# Configuración para publicar la calculadora en Render (https://render.com)
+services:
+  - type: web
+    name: calculadora-metodos-numericos
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
